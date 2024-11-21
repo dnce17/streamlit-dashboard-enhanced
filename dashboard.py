@@ -11,12 +11,10 @@ st.text("""In this streamlit dashboard, we are going to focus on some recently r
 # https://healthdata.gov/National/School-Learning-Modalities-2020-2021/a8v3-a3m3/about_data
 df = pd.read_csv("https://healthdata.gov/resource/a8v3-a3m3.csv?$limit=50000") ## first 1k 
 
-## data cleaning 
+# Data cleaning 
 df['week_recoded'] = pd.to_datetime(df['week'])
+# Remove timestamp from the date since it isn't used as it's all 00:00:00
 df['week_recoded'] = [date.strftime("%Y-%m-%d") for date in df['week_recoded']]
-df['zip_code'] = df['zip_code'].astype(str)
-
-df['week_recoded'].value_counts()
 
 # Box to show how many rows and columns of data we have: 
 col1, col2, col3 = st.columns(3)
@@ -29,34 +27,41 @@ st.dataframe(df)
 
 
 # ---- HORIZONTAL BAR CHART
-st.subheader("Learning Modality Over Time (Weeks)")
-# Toggle learning_modality (in case user wants to focus on 1 specific chart)
+st.subheader("Changes in Learning Modality Over Time (Weeks)")
+
+# Toggle learning modality (in case user wants to focus on 1 specific chart)
 st.write("**Toggle to hide or show week and learning modality charts**")
 hybrid = st.checkbox("Hybrid", value=True)
 in_person = st.checkbox("In Person", value=True)
 remote = st.checkbox("Remote", value=True)
 
 # Slider to filter date for week and learning modality bar charts
-st.write(f"**Filter Date Range**")
+st.write(f"**Filter Date Range of Bar Charts Below**")
 str_dates = [date for date in df['week_recoded'].unique()]
 date_selector = st.select_slider(
     'Date Range',
     options=str_dates,
     value=str_dates[-1],
 )
+
+# Shows the date range that the bar charts are showing
 st.write(f'**Date Range**: {str_dates[0]} to {date_selector}')
 
+# Filter the date based on the slider
 filtered_range = df[pd.to_datetime(df['week_recoded']) <= date_selector]
 
-# DON'T add this or else it will show other unrelated time/date b/w the dates you want to see
+# NOTE for future reference: DON'T add this or else it will show time/dates outside the df's dates
 # filtered_range['week_recoded'] = pd.to_datetime(filtered_range['week_recoded'])
 
 table = pd.pivot_table(filtered_range, values='student_count', index=['week_recoded'],
                        columns=['learning_modality'], aggfunc="sum")
 
 table = table.reset_index()
+
+# In the Streamlit site, this shows a table with the columns
 table.columns
 
+# Show/hide bar charts if modality is checked on/off
 def toggle_bar_chart(toggle_on, table, x_label, y_label, horizontal=False):
     if toggle_on:
         if horizontal == False:
@@ -64,7 +69,6 @@ def toggle_bar_chart(toggle_on, table, x_label, y_label, horizontal=False):
         else:
             st.bar_chart(table, x=x_label, y=y_label, horizontal=True)
 
-# Show/hide bar charts 
 toggle_bar_chart(hybrid, table, "week_recoded", "Hybrid", True)
 toggle_bar_chart(in_person, table, "week_recoded", "In Person", True)
 toggle_bar_chart(remote, table, "week_recoded", "Remote", True)
@@ -89,16 +93,15 @@ st.plotly_chart(pie_fig)
 
 
 # ---- CHOROPLETH MAP
-st.subheader("**Geographical Distribution of Learning Modality**")
+st.subheader("**Geographical Distribution of Learning Modality in US**")
 
 state_modality_data = df.groupby(["state", "learning_modality"])["student_count"].sum().reset_index()
 
-# Select widget - allow user to select a learning modality
+# Select widget to choose which learning modality to display
 modality = st.selectbox("Select Learning Modality", df["learning_modality"].unique(), index=2)
 
-# Filter data for the selected modality
+# Filter data for selected modality
 filtered_modality = state_modality_data[state_modality_data["learning_modality"] == modality]
-
 
 # Create choropleth map
 fig = px.choropleth(
@@ -116,10 +119,10 @@ fig = px.choropleth(
 st.plotly_chart(fig)
 
 
-# ---- BAR CHART - Operational Schools and Student Count
+# ---- BAR CHART
 st.subheader("**Distribution of Operational Schools Across States**")
 
-# Amount of operational school per state
+# Get the total amt of operational schools per state
 state_total_schools = df.groupby("state")["operational_schools"].sum().reset_index()
 
 st.write("**NOTE**: Hover over the chart and click the fullscreen button to the top right to see all state labels")
